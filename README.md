@@ -9,7 +9,7 @@
 直接双击 `index.html`，或在项目目录启动本地服务器：
 ```bash
 python -m http.server 8000
-# 浏览器打开 http://localhost:8000/index.html
+# 浏览器打开 https://lilicen.github.io/kfc-v50/
 ```
 
 ## 部署到 GitHub Pages
@@ -59,8 +59,7 @@ npx http-server -p 8000
 然后查看电脑 IP 地址：
 - Windows: `ipconfig` 查看 IPv4 地址
 - Mac/Linux: `ifconfig` 或 `ip addr`
-手机浏览器打开：`http://你的IP:8000/index.html`
-
+手机浏览器打开：`https://lilicen.github.io/kfc-v50/
 ### 方法三：使用内网穿透工具（推荐用于分享）
 - **ngrok**：`ngrok http 8000`，会生成一个公网链接
 - **localtunnel**：`npx localtunnel --port 8000`
