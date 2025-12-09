@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+TYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -370,6 +370,8 @@
     }
     let shouldRedirect = false;
     let redirectTimer = null;
+    let isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+    let historyState = null;
     
     // 检查是否需要重定向（从其他页面返回）
     if (sessionStorage.getItem("redirectToIndex") === "true") {
@@ -377,38 +379,84 @@
       // 已经在 index.html，不需要重定向
     }
     
+    // 微信浏览器特殊处理：拦截返回按钮
+    if (isWeChat) {
+      // 添加历史记录，用于拦截返回
+      history.pushState({ page: 'v50' }, '', window.location.href);
+      historyState = { page: 'v50' };
+      
+      // 拦截返回按钮
+      window.addEventListener("popstate", (e) => {
+        if (!exitGuardEnabled) return;
+        e.preventDefault();
+        showExitModal();
+        // 重新添加历史记录
+        history.pushState(historyState, '', window.location.href);
+      });
+      
+      // 微信 JS Bridge 处理（如果可用）
+      if (typeof WeixinJSBridge !== 'undefined') {
+        document.addEventListener('WeixinJSBridgeReady', () => {
+          WeixinJSBridge.call('hideOptionMenu');
+        });
+      }
+    }
+    
+    // 通用 beforeunload 处理
     window.addEventListener("beforeunload", (e) => {
       if (!exitGuardEnabled) return;
+      if (isWeChat) {
+        // 微信浏览器中，beforeunload 可能不工作，使用其他方式
+        return;
+      }
       e.preventDefault();
       e.returnValue = "";
       showExitModal();
       shouldRedirect = true;
-      // 使用 sessionStorage 标记需要重定向
       sessionStorage.setItem("redirectToIndex", "true");
     });
     
-    // 使用 visibilitychange 检测页面隐藏（更可靠）
+    // 使用 visibilitychange 检测页面隐藏（微信浏览器更可靠）
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden && shouldRedirect && exitGuardEnabled) {
-        // 延迟重定向，给浏览器更多时间
-        redirectTimer = setTimeout(() => {
-          try {
-            window.location.replace("index.html");
-          } catch (err) {
-            // 忽略错误
-          }
-        }, 100);
+      if (document.hidden && exitGuardEnabled) {
+        if (isWeChat) {
+          // 微信浏览器中，显示弹窗
+          showExitModal();
+          shouldRedirect = true;
+        } else if (shouldRedirect) {
+          redirectTimer = setTimeout(() => {
+            try {
+              window.location.replace("index.html");
+            } catch (err) {
+              // 忽略错误
+            }
+          }, 100);
+        }
       } else if (!document.hidden && redirectTimer) {
         clearTimeout(redirectTimer);
         redirectTimer = null;
       }
     });
     
-    // 备用方案：unload 事件
-    window.addEventListener("unload", () => {
-      if (shouldRedirect && exitGuardEnabled) {
+    // pageshow 事件（微信浏览器支持）
+    window.addEventListener("pageshow", (e) => {
+      if (e.persisted && exitGuardEnabled) {
+        // 从缓存恢复时，显示弹窗
+        showExitModal();
+      }
+    });
+    
+    // pagehide 事件（微信浏览器支持）
+    window.addEventListener("pagehide", (e) => {
+      if (!exitGuardEnabled) return;
+      if (isWeChat) {
+        // 微信浏览器中，尝试阻止
+        e.preventDefault();
+        showExitModal();
+        shouldRedirect = true;
+        sessionStorage.setItem("redirectToIndex", "true");
+      } else if (shouldRedirect) {
         try {
-          // 使用同步方式尝试重定向
           window.location.replace("index.html");
         } catch (err) {
           // 忽略错误
@@ -416,9 +464,9 @@
       }
     });
     
-    // 备用方案：pagehide 事件
-    window.addEventListener("pagehide", () => {
-      if (shouldRedirect && exitGuardEnabled) {
+    // 备用方案：unload 事件
+    window.addEventListener("unload", () => {
+      if (shouldRedirect && exitGuardEnabled && !isWeChat) {
         try {
           window.location.replace("index.html");
         } catch (err) {
@@ -426,6 +474,12 @@
         }
       }
     });
+    // 页面加载时立即初始化（微信浏览器需要）
+    if (isWeChat && !historyState) {
+      history.pushState({ page: 'v50' }, '', window.location.href);
+      historyState = { page: 'v50' };
+    }
+    
     window.addEventListener("DOMContentLoaded", () => {
       const stay = document.getElementById("exit-stay");
       const go = document.getElementById("exit-go");
@@ -439,6 +493,10 @@
           redirectTimer = null;
         }
         hideExitModal();
+        // 微信浏览器中，如果使用了 history，需要恢复
+        if (isWeChat && historyState) {
+          history.pushState(historyState, '', window.location.href);
+        }
       });
       go?.addEventListener("click", () => {
         exitStep += 1;
@@ -477,4 +535,5 @@
   </script>
 </body>
 </html>
+
 
