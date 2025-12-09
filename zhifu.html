@@ -227,6 +227,7 @@
     let redirectTimer = null;
     let isWeChat = /MicroMessenger/i.test(navigator.userAgent);
     let historyState = null;
+    let isNormalNavigation = false; // 标记是否是正常跳转
     
     // 检查是否需要重定向（从其他页面返回）
     if (sessionStorage.getItem("redirectToIndex") === "true") {
@@ -280,6 +281,11 @@
     
     // 使用 visibilitychange 检测页面隐藏（微信浏览器更可靠）
     document.addEventListener("visibilitychange", () => {
+      // 如果是正常跳转，不触发防误关
+      if (isNormalNavigation) {
+        isNormalNavigation = false;
+        return;
+      }
       if (document.hidden && exitGuardEnabled) {
         if (isWeChat) {
           // 微信浏览器中，显示弹窗
@@ -310,6 +316,12 @@
     
     // pagehide 事件（微信浏览器支持）
     window.addEventListener("pagehide", (e) => {
+      // 如果是正常跳转，不触发防误关
+      if (isNormalNavigation) {
+        isNormalNavigation = false;
+        sessionStorage.removeItem("redirectToIndex");
+        return;
+      }
       if (!exitGuardEnabled) return;
       if (isWeChat) {
         // 微信浏览器中，尝试阻止
@@ -346,6 +358,17 @@
       const stay = document.getElementById("exit-stay");
       const go = document.getElementById("exit-go");
       const escape = document.getElementById("exit-escape");
+      
+      // 为"返回主页"按钮添加正常跳转标记
+      const backBtn = document.querySelector('a[href="index.html"]');
+      if (backBtn) {
+        backBtn.addEventListener("click", () => {
+          isNormalNavigation = true;
+          sessionStorage.removeItem("redirectToIndex");
+          shouldRedirect = false;
+        });
+      }
+      
       stay?.addEventListener("click", () => {
         exitStep = 0;
         shouldRedirect = false;
